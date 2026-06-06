@@ -1,0 +1,45 @@
+# MAAM User Configuration Example
+# This file should be placed at ~/.maam/config.yaml
+
+version: "1"
+
+# Path to the local registry where assets are managed
+registry_path: ~/.maam/registry
+
+# Default mode for deploying assets into projects
+default_deployment_mode: symlink
+
+# Asset kinds that MAAM should manage
+managed_kinds:
+  - skill
+  - agent
+  - command
+  - mcp-server
+
+# Registered GitHub registries
+registries:
+  anthropics:
+    url: https://github.com/anthropics/skills
+  superpowers:
+    url: https://github.com/obra/superpowers
+  surjit_skills:
+    url: https://github.com/neurongraph/skills_repo
+  obsidian:
+    url: https://github.com/kepano/obsidian-skills
+  artmind:
+    url: https://github.com/neurongraph/artmind9
+
+# Agent Harness (Tools) Configuration
+# These extend or override the built-in defaults
+tools:
+  claude-code:
+    enabled: true
+    kinds:
+      skill: .claude/skills
+      agent: .claude/agents
+      command: .claude/commands
+  opencode:
+    enabled: true
+    kinds:
+      skill: .opencode/skills
+      agent: .opencode/agents

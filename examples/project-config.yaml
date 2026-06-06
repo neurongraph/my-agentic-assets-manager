@@ -1,0 +1,7 @@
+profile: coding-project
+local_assets:
+  - custom-tooling
+tools:
+  claude-code:
+    additional_assets:
+      - extra-agent
