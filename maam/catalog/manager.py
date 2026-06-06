@@ -5,7 +5,14 @@ from typing import Dict, List, Optional, Tuple
 
 from maam.catalog.skills import import_msm_skill, is_msm_skill, synthesize_manifest
 from maam.config.io import load_model, load_yaml, save_yaml
-from maam.config.models import AssetKind, AssetManifest, RegistryConfig, UserConfig
+from maam.config.models import (
+    AssetDeployment,
+    AssetKind,
+    AssetManifest,
+    DeploymentMode,
+    RegistryConfig,
+    UserConfig,
+)
 from maam.config.paths import get_local_registry_path, get_maam_home
 
 
@@ -85,6 +92,11 @@ class CatalogManager:
                         kind=kind,
                         version="0.1.0",
                         description=f"{kind.capitalize()}: {item.stem}",
+                        deployment=AssetDeployment(
+                            strategy=DeploymentMode.COPY
+                            if kind == "agent"
+                            else DeploymentMode.SYMLINK
+                        ),
                     )
                     self._add_to_assets(assets, reg_name, item, manifest)
 
@@ -105,6 +117,11 @@ class CatalogManager:
                     kind=kind,
                     version="0.1.0",
                     description=f"{kind.capitalize()}: {item.stem}",
+                    deployment=AssetDeployment(
+                        strategy=DeploymentMode.COPY
+                        if kind == "agent"
+                        else DeploymentMode.SYMLINK
+                    ),
                 )
                 self._add_to_assets(assets, reg_name, item, manifest)
 

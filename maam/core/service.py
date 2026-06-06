@@ -1,15 +1,29 @@
 import os
 from pathlib import Path
-from typing import List, Dict, Set, Tuple, Optional
-from maam.config.models import (
-    UserConfig, ProjectConfig, ProjectState, AssetKind, 
-    DeploymentRecord, DeploymentStatus, ProfileConfig, ExportConfig
-)
-from maam.config.io import load_model, save_model
-from maam.config.paths import get_project_config_path, get_project_state_path, get_maam_home, get_user_config_path
+from typing import Dict, List, Optional, Set, Tuple
+
 from maam.catalog.manager import CatalogManager
-from maam.tools.manager import ToolManager
+from maam.config.io import load_model, save_model
+from maam.config.models import (
+    AssetKind,
+    DeploymentMode,
+    DeploymentRecord,
+    DeploymentStatus,
+    ExportConfig,
+    ProfileConfig,
+    ProjectConfig,
+    ProjectState,
+    UserConfig,
+)
+from maam.config.paths import (
+    get_maam_home,
+    get_project_config_path,
+    get_project_state_path,
+    get_user_config_path,
+)
 from maam.deploy.engine import DeploymentEngine
+from maam.tools.manager import ToolManager
+
 
 class MAAMService:
     def __init__(self, user_config: UserConfig, project_dir: Path):
@@ -38,24 +52,24 @@ class MAAMService:
         project_config_path = get_project_config_path(self.project_dir)
         if not project_config_path.exists():
             return []
-            
+
         project_config = load_model(ProjectConfig, project_config_path)
         project_state_path = get_project_state_path(self.project_dir)
         project_state = load_model(ProjectState, project_state_path)
-        
+
         all_available = self.catalog.list_assets()
-        
+
         def find_assets(identifier: str) -> List[Tuple[AssetKind, str, Path]]:
             matches = []
             target_kind = None
             name = identifier
-            
+
             if ":" in identifier:
                 kind_part, name = identifier.split(":", 1)
                 try:
                     target_kind = AssetKind(kind_part)
                 except ValueError:
-                    pass # Treat as part of the name if not a valid kind
+                    pass  # Treat as part of the name if not a valid kind
 
             for (kind, a_name), sources in all_available.items():
                 if a_name == name:
@@ -86,7 +100,7 @@ class MAAMService:
         # 2. Resolve project-local additions
         for ident in project_config.local_assets:
             add_desired(ident)
-        
+
         for tool_name, tool_cfg in project_config.tools.items():
             for ident in tool_cfg.additional_assets:
                 add_desired(ident, tool_limit=tool_name)
@@ -94,24 +108,31 @@ class MAAMService:
         # 3. Reconcile
         new_state = ProjectState()
         active_targets = {}
-        
+
         for asset_name, kind, tool_name in desired:
             resolved = self.catalog.resolve_asset(kind, asset_name)
             if not resolved:
                 continue
-                
-            _, source_path, _ = resolved
-            target_dir = self.tools.resolve_target_path(tool_name, kind, self.project_dir)
+
+            _, source_path, manifest = resolved
+            target_dir = self.tools.resolve_target_path(
+                tool_name, kind, self.project_dir
+            )
             if not target_dir:
                 continue
-                
+
+            # Respect manifest strategy if specified, otherwise use global default
+            mode_preference = self.user_config.default_deployment_mode
+            if manifest.deployment.strategy == DeploymentMode.COPY:
+                mode_preference = DeploymentMode.COPY
+
             record = self.deployer.deploy_asset(
                 name=asset_name,
                 kind=kind,
                 tool=tool_name,
                 source=source_path,
                 target_dir=target_dir,
-                mode_preference=self.user_config.default_deployment_mode
+                mode_preference=mode_preference,
             )
             new_state.deployments.append(record)
             active_targets[record.target] = record
@@ -126,15 +147,15 @@ class MAAMService:
 
     def export_config(self, output_path: Path):
         export = ExportConfig(
-            registries=self.user_config.registries,
-            tools=self.user_config.tools
+            registries=self.user_config.registries, tools=self.user_config.tools
         )
         if self.profiles_path.exists():
             for p_file in self.profiles_path.glob("*.yaml"):
                 try:
                     profile = load_model(ProfileConfig, p_file)
                     export.profiles[profile.name] = profile
-                except Exception: continue
+                except Exception:
+                    continue
         save_model(output_path, export)
 
     def import_config(self, input_path: Path):
