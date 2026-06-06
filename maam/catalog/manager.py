@@ -201,14 +201,43 @@ class CatalogManager:
 
     def update_registries(self):
         self.registries_path.mkdir(parents=True, exist_ok=True)
+
+        # Calculate sparse-checkout patterns based on managed kinds
+        # We want to fetch 'assets/', and plural/singular forms of each kind
+        patterns = ["assets"]
+        for kind in self.user_config.managed_kinds:
+            patterns.append(kind)
+            if not kind.endswith("s"):
+                patterns.append(f"{kind}s")
+
         for name, config in self.user_config.registries.items():
             reg_dir = self.registries_path / name
+
+            if not reg_dir.exists():
+                # Initial clone with partial clone and sparse-checkout enabled
+                clone_cmd = [
+                    "git",
+                    "clone",
+                    "--depth",
+                    "1",
+                    "--filter=blob:none",
+                    "--sparse",
+                ]
+                if config.branch:
+                    clone_cmd += ["-b", config.branch]
+                clone_cmd += [config.url, str(reg_dir)]
+
+                subprocess.run(clone_cmd, check=False)
+
             if reg_dir.exists():
+                # Ensure sparse-checkout patterns are set (updates if changed)
+                # This also converts a full clone to a sparse clone if needed
+                subprocess.run(
+                    ["git", "-C", str(reg_dir), "sparse-checkout", "set"] + patterns,
+                    check=False,
+                )
+
+                # Pull latest changes
                 subprocess.run(
                     ["git", "-C", str(reg_dir), "pull", "--ff-only"], check=False
-                )
-            else:
-                subprocess.run(
-                    ["git", "clone", "--depth", "1", config.url, str(reg_dir)],
-                    check=False,
                 )
